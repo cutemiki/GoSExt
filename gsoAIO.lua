@@ -1,4 +1,4 @@
-local VERSION = 7.1
+local VERSION = 7.2
 -- [ check if champion is supported ]
     local SUPPORTED_CHAMPIONS =
     {
@@ -444,9 +444,17 @@ META =
                     hitChance = 2
                 end
                 if radius > 0 then
-                    CastPos = unit:GetPrediction(math.huge,delay):Extended(unitPos, radius * 0.5)
+                    if speed < 10000 then
+                        CastPos = unit:GetPrediction(speed,spellData.delay):Extended(unitPos, radius * 0.5)
+                    else
+                        CastPos = unit:GetPrediction(math.huge,delay):Extended(unitPos, radius * 0.5)
+                    end
                 else
-                    CastPos = unit:GetPrediction(math.huge,delay)
+                    if speed < 10000 then
+                        CastPos = unit:GetPrediction(speed,spellData.delay)
+                    else
+                        CastPos = unit:GetPrediction(math.huge,delay)
+                    end
                 end
             elseif isImmobile or isCastingSpell then
                 CastPos = unit.pos
