@@ -5,7 +5,7 @@ if _G.SDK and _G.SDK.Orbwalker then
 	print("Gamsteron Core can not be loaded ! Please unload IC Orbwalker first !")
 	return
 end
-local Version = 19.3
+local Version = 19.4
 -- update
 local Files =
 {
@@ -172,7 +172,7 @@ META1 =
 			if self.CastPos == nil then return end
 			local newpos
 			if self.CastPos.pos then
-				newpos = Vector(self.CastPos.pos.x, self.CastPos.pos.y, self.CastPos.pos.z + self.CastPos.boundingRadius * 0.5):To2D()
+				newpos = Vector(self.CastPos.pos.x, self.CastPos.pos.y + (self.CastPos.boundingRadius * 0.8), self.CastPos.pos.z):To2D()
 			else
 				newpos = self.CastPos:To2D()
 			end
