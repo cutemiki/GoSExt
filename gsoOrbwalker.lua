@@ -5,7 +5,7 @@ if _G.SDK and _G.SDK.Orbwalker then
 	print("Gamsteron Core can not be loaded ! Please unload IC Orbwalker first !")
 	return
 end
-local Version = 19.2
+local Version = 19.3
 -- update
 local Files =
 {
@@ -1073,6 +1073,11 @@ META1 =
 			setmetatable(result, c)
 		function c:CreateMenu()
 			MENU:MenuElement({name = "Orbwalker", id = "orb", type = _G.MENU, leftIcon = "https://raw.githubusercontent.com/gamsteron/GoSExt/master/Icons/orb.png" })
+				MENU.orb:MenuElement({ name = "Extra Windup", id = "extrawindup", value = 0, min = 0, max = 100, step = 1 })
+				MENU.orb:MenuElement({ name = "Latency", id = "clat", value = 50, min = 0, max = 80, step = 1 })
+				MENU.orb:MenuElement({ name = "Extra Cursor Delay", id = "excdelay", value = 25, min = 0, max = 50, step = 5 })
+				MENU.orb:MenuElement({name = "Player Attack Move Click", id = "aamoveclick", key = string.byte("P")})
+				MENU.orb:MenuElement({name = "Attack cancel ? Increase extra windup time !", id = "spaceping", type = SPACE})
 				MENU_CHAMP = MENU.orb:MenuElement({name = LocalCharName, id = LocalCharName, type = _G.MENU})
 					MENU_CHAMP:MenuElement({ name = "Spell Manager", id = "spell", type = _G.MENU })
 						MENU_CHAMP.spell:MenuElement({name = "Block if is attacking", id = "isaa", value = true })
@@ -1114,10 +1119,6 @@ META1 =
 						MENU.orb.humanizer.random:MenuElement({name = "To", id = "to", value = 220, min = 60, max = 400, step = 20 })
 					MENU.orb.humanizer:MenuElement({name = "Humanizer", id = "standard", value = 200, min = 60, max = 300, step = 10 })
 						Orbwalker.Menu.General.MovementDelay = MENU.orb.humanizer.standard
-				MENU.orb:MenuElement({name = "Attack cancel ? Decrease \"Your Ping\"", id = "spaceping", type = SPACE})
-				MENU.orb:MenuElement({ name = "Your Ping", id = "clat", value = 50, min = 0, max = 80, step = 1 })
-				MENU.orb:MenuElement({ name = "Extra Cursor Delay", id = "excdelay", value = 25, min = 0, max = 50, step = 5 })
-				MENU.orb:MenuElement({name = "Player Attack Move Click", id = "aamoveclick", key = string.byte("P")})
 		end
 		function c:CreateDrawMenu(menu)
 			MENU.gsodraw:MenuElement({name = "MyHero Attack Range", id = "me", type = _G.MENU})
@@ -1252,7 +1253,7 @@ META1 =
 				return true
 			end
 			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackCastEndTime + 0.01 - UTILS:GetLatency(0) then
+				if LocalGameTimer() >= self.AttackCastEndTime + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
 					return true
 				end
 				if MENU_CHAMP.lcore.enabled:Value() and LocalGameTimer() > self.AttackLocalStart + self.AttackWindUp + MENU_CHAMP.lcore.extraw:Value() * 0.001 then
@@ -1292,7 +1293,7 @@ META1 =
 				return false
 			end
 			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackCastEndTime + extraDelay + 0.01 - UTILS:GetLatency(0) then
+				if LocalGameTimer() >= self.AttackCastEndTime + extraDelay + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
 					return true
 				end
 				if MENU_CHAMP.lcore.enabled:Value() and LocalGameTimer() > self.AttackLocalStart + self.AttackWindUp + MENU_CHAMP.lcore.extraw:Value() * 0.001 then
@@ -1758,7 +1759,7 @@ META1 =
 			return x * x + z * z
 		end
 		function c:GetLatency(extra)
-			return extra + MENU.orb.clat:Value() * 0.001
+			return extra + (MENU.orb.clat:Value() * 0.001)
 		end
 		function c:IsImmobile(unit, delay)
 			-- http://leagueoflegends.wikia.com/wiki/Types_of_Crowd_Control
