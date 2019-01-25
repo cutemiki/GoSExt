@@ -5,7 +5,7 @@ if _G.SDK and _G.SDK.Orbwalker then
 	print("Gamsteron Core can not be loaded ! Please unload IC Orbwalker first !")
 	return
 end
-local Version = 19.6
+local Version = 19.7
 -- update
 local Files =
 {
@@ -168,8 +168,10 @@ META1 =
 			local newpos
 			if self.CastPos.pos then
 				newpos = Vector(self.CastPos.pos.x, self.CastPos.pos.y + self.CastPos.boundingRadius * 0.5, self.CastPos.pos.z):To2D()
-			else
+			elseif self.CastPos.z then
 				newpos = self.CastPos:To2D()
+			else
+				newpos = self.CastPos
 			end
 			LocalControlSetCursorPos(newpos.x, newpos.y)
 			if self.Work ~= nil then--and Utilities:GetDistance2DSquared(newpos, _G.cursorPos) <= MAXIMUM_MOUSE_DISTANCE then
