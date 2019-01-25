@@ -5,7 +5,7 @@ if _G.SDK and _G.SDK.Orbwalker then
 	print("Gamsteron Core can not be loaded ! Please unload IC Orbwalker first !")
 	return
 end
-local Version = 19.4
+local Version = 19.5
 -- update
 local Files =
 {
@@ -142,14 +142,9 @@ local MAXIMUM_MOUSE_DISTANCE		= 120 * 120
 META1 =
 {
 	RESET = function()
-		MENU_CHAMP.lcore.enabled:Value(false)
-		MENU_CHAMP.lcore.response:Value(false)
-		MENU_CHAMP.lcore.extraw:Value(100)
 		MENU_CHAMP.hold.HoldRadius:Value(120)
 		MENU_CHAMP.spell.isaa:Value(true)
 		MENU_CHAMP.spell.baa:Value(false)
-		MENU_CHAMP.lclear.laneset:Value(true)
-		MENU_CHAMP.lclear.swait:Value(500)
 	end,
 	CURSOR = function()
 		local c = {}
@@ -172,7 +167,7 @@ META1 =
 			if self.CastPos == nil then return end
 			local newpos
 			if self.CastPos.pos then
-				newpos = Vector(self.CastPos.pos.x, self.CastPos.pos.y + (self.CastPos.boundingRadius * 0.8), self.CastPos.pos.z):To2D()
+				newpos = Vector(self.CastPos.pos.x, self.CastPos.pos.y + self.CastPos.boundingRadius * 0.5, self.CastPos.pos.z):To2D()
 			else
 				newpos = self.CastPos:To2D()
 			end
@@ -626,12 +621,12 @@ META1 =
 		function c:GetLaneClearTarget()
 			local enemyTurrets = OB:GetEnemyTurrets(myHero.range+myHero.boundingRadius - 35, true)
 			if #enemyTurrets >= 1 then return enemyTurrets[1] end
-			if MENU_CHAMP.lclear.laneset:Value() then
+			if MENU.orb.lclear.laneset:Value() then
 				local result = TS:GetComboTarget()
 				if result then return result end
 			end
 			local result = nil
-			if LocalGameTimer() > self.ShouldWaitTime + MENU_CHAMP.lclear.swait:Value() * 0.001 then
+			if LocalGameTimer() > self.ShouldWaitTime + MENU.orb.lclear.swait:Value() * 0.001 then
 				local min = 10000000
 				for i = 1, #self.FarmMinions do
 					local target = self.FarmMinions[i]
@@ -728,7 +723,7 @@ META1 =
 					if self.CachedAttackData[objname][name] == nil then
 						self.CachedAttackData[objname][name] = { Range = Utilities:GetAutoAttackRange(obj, target), Damage = 0 }
 					end
-					local range = self.CachedAttackData[objname][name].Range + 100
+					local range = self.CachedAttackData[objname][name].Range + 250
 					if Utilities:GetDistanceSquared(obj.pos, pos) < range * range then
 						if self.CachedAttackData[objname][name].Damage == 0 then
 							self.CachedAttackData[objname][name].Damage = Damage:GetAutoAttackDamage(obj, target)
@@ -771,10 +766,6 @@ META1 =
 				local dmg = attack.Damage
 				local objtype = attack.Type
 				local isTurret = objtype == Obj_AI_Turret
-				local time2 = time
-				if isTurret then
-					time2 = time2 - 0.1
-				end
 				local ismoving = false
 				if not isTurret then ismoving = attacker.pathing.hasMovePath end
 				if attacker.attackData.target == handle and not ismoving then
@@ -782,8 +773,10 @@ META1 =
 						self.TurretHasTarget = true
 					end
 					local flyTime
-					if attacker.attackData.projectileSpeed and attacker.attackData.projectileSpeed > 0 then
-						flyTime = attacker.pos:DistanceTo(pos) / attacker.attackData.projectileSpeed
+					local time2 = time
+					local projSpeed = attacker.attackData.projectileSpeed; if isTurret then projSpeed = 700; time2 = time2 - 0.1; end
+					if projSpeed and projSpeed > 0 then
+						flyTime = attacker.pos:DistanceTo(pos) / projSpeed
 					else
 						flyTime = 0
 					end
@@ -810,7 +803,7 @@ META1 =
 			if lastHitable then self.IsLastHitable = true end
 			local almostLastHitable = false
 			if not lastHitable then
-				local dmg = self:GetPrediction(target, (myHero.attackData.animationTime * 1.5) + (time * 3)) - self:GetPossibleDmg(target)
+				local dmg = self:GetPrediction(target, myHero.attackData.animationTime * 2.1 + time * 2.1) - self:GetPossibleDmg(target)
 				almostLastHitable = dmg - damage < 0
 			end
 			if almostLastHitable then
@@ -828,13 +821,13 @@ META1 =
 			self.TurretHasTarget = false
 			self.CanCheckTurret = true
 			self.IsLastHitable = false
-			if Orbwalker.Modes[ORBWALKER_MODE_COMBO] then
+			if Orbwalker.IsNone or Orbwalker.Modes[ORBWALKER_MODE_COMBO] then
 				self.CanCheckTurret = false
 				return
 			end
 			local targets = OB:GetEnemyMinions(myHero.range + myHero.boundingRadius, true)
 			local projectileSpeed = UTILS:GetProjSpeed()
-			local winduptime = UTILS:GetWindup()
+			local winduptime = UTILS:GetWindup() - (MENU.orb.lclear.extrafarm:Value() * 0.001)
 			local latency = UTILS:GetLatency(0) * 0.5
 			local pos = myHero.pos
 			for i = 1, #targets do
@@ -982,13 +975,8 @@ META1 =
 			-- Attack
 			ResetAttack = false,
 			AttackStartTime = 0,
-			AttackEndTime = 0,
-			AttackCastEndTime = 1,
+			AttackCastEndTime = 0,
 			AttackLocalStart = 0,
-			AttackSpeed = 0,
-			AttackWindUp = 0,
-			AttackAnim = 0,
-			AttackProjSpeed = -1,
 			AutoAttackResets =
 			{
 				["Blitzcrank"] = { Slot = _E, toggle = true },
@@ -1074,22 +1062,17 @@ META1 =
 		function c:CreateMenu()
 			MENU:MenuElement({name = "Orbwalker", id = "orb", type = _G.MENU, leftIcon = "https://raw.githubusercontent.com/gamsteron/GoSExt/master/Icons/orb.png" })
 				MENU.orb:MenuElement({ name = "Extra Windup", id = "extrawindup", value = 0, min = 0, max = 100, step = 1 })
-				MENU.orb:MenuElement({ name = "Latency", id = "clat", value = 50, min = 0, max = 80, step = 1 })
+				MENU.orb:MenuElement({ name = "Latency", id = "clat", value = 50, min = 0, max = 150, step = 1 })
 				MENU.orb:MenuElement({ name = "Extra Cursor Delay", id = "excdelay", value = 25, min = 0, max = 50, step = 5 })
 				MENU.orb:MenuElement({name = "Player Attack Move Click", id = "aamoveclick", key = string.byte("P")})
-				MENU.orb:MenuElement({name = "Attack cancel ? Increase extra windup time !", id = "spaceping", type = SPACE})
+				MENU.orb:MenuElement({ name = "LaneClear", id = "lclear", type = _G.MENU })
+					MENU.orb.lclear:MenuElement({name = "Attack Heroes", id = "laneset", value = true })
+					MENU.orb.lclear:MenuElement({name = "Extra Farm Delay", id = "extrafarm", value = 50, min = 0, max = 100, step = 1 })
+					MENU.orb.lclear:MenuElement({name = "Should Wait Time", id = "swait", value = 500, min = 0, max = 1000, step = 100 })
 				MENU_CHAMP = MENU.orb:MenuElement({name = LocalCharName, id = LocalCharName, type = _G.MENU})
 					MENU_CHAMP:MenuElement({ name = "Spell Manager", id = "spell", type = _G.MENU })
 						MENU_CHAMP.spell:MenuElement({name = "Block if is attacking", id = "isaa", value = true })
 						MENU_CHAMP.spell:MenuElement({name = "Spells between attacks", id = "baa", value = false })
-					MENU_CHAMP:MenuElement({ name = "Orbwalker Core", id = "lcore", type = _G.MENU })
-						MENU_CHAMP.lcore:MenuElement({name = "Use at own risk ! There can be attack cancels !", id = "space", type = SPACE})
-						MENU_CHAMP.lcore:MenuElement({name = "ON - Local, OFF - Server", id = "enabled", value = false })
-						MENU_CHAMP.lcore:MenuElement({name = "Only Local (if Local ON)", id = "response", value = false })
-						MENU_CHAMP.lcore:MenuElement({ name = "Local Extra Windup", id = "extraw", value = 100, min = 0, max = 100, step = 10 })
-					MENU_CHAMP:MenuElement({ name = "LaneClear", id = "lclear", type = _G.MENU })
-						MENU_CHAMP.lclear:MenuElement({name = "Attack Heroes", id = "laneset", value = true })
-						MENU_CHAMP.lclear:MenuElement({name = "Should Wait Time", id = "swait", value = 500, min = 0, max = 1000, step = 100 })
 					MENU_CHAMP:MenuElement({ name = "Hold Radius", id = "hold", type = _G.MENU })
 						MENU_CHAMP.hold:MenuElement({ id = "HoldRadius", name = "Hold Radius", value = 120, min = 100, max = 250, step = 10 })
 							Orbwalker.Menu.General.HoldRadius = MENU_CHAMP.hold.HoldRadius
@@ -1211,6 +1194,12 @@ META1 =
 			self.LastMoveLocal = LocalGameTimer() + UTILS:GetHumanizer()
 			self.LastMoveTime = LocalGameTimer()
 		end
+		function c:WaitingForResponseFromServer()
+			if LocalGameTimer() < self.AttackLocalStart + 0.2 then
+				return true
+			end
+			return false
+		end
 		function c:CanAttack()
 			if not self.CanAttackC() then return false end
 			if self.IsBlindedByTeemo then
@@ -1234,36 +1223,23 @@ META1 =
 			if LocalGameTimer() < SPELLS.ObjectEndTime then
 				return false
 			end
-			if MENU_CHAMP.lcore.enabled:Value() and MENU_CHAMP.lcore.response:Value() and LocalGameTimer() < self.AttackLocalStart + self.AttackWindUp + 0.2 then
-				return false
-			end
 			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackEndTime - UTILS:GetLatency(0) - 0.04 then
+				if LocalGameTimer() >= self.AttackStartTime + myHero.attackData.animationTime - UTILS:GetLatency(0) - 0.04 then
 					return true
 				end
 				return false
 			end
-			if LocalGameTimer() < self.AttackLocalStart + 0.2 then
-				return false
-			end
+			if self:WaitingForResponseFromServer() then return false end
 			return true
 		end
 		function c:CanMoveSpell()
-			if MENU_CHAMP.lcore.enabled:Value() and MENU_CHAMP.lcore.response:Value() and LocalGameTimer() > self.AttackLocalStart + self.AttackWindUp + MENU_CHAMP.lcore.extraw:Value() * 0.001 then
-				return true
-			end
 			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackCastEndTime + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
-					return true
-				end
-				if MENU_CHAMP.lcore.enabled:Value() and LocalGameTimer() > self.AttackLocalStart + self.AttackWindUp + MENU_CHAMP.lcore.extraw:Value() * 0.001 then
+				if LocalGameTimer() >= self.AttackStartTime + UTILS:GetWindup() + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
 					return true
 				end
 				return false
 			end
-			if LocalGameTimer() < self.AttackLocalStart + 0.2 then
-				return false
-			end
+			if self:WaitingForResponseFromServer() then return false end
 			return true
 		end
 		function c:CanMove(extraDelay)
@@ -1286,24 +1262,16 @@ META1 =
 			if self.ChampionCanMove[LocalCharName] ~= nil and not self.ChampionCanMove[LocalCharName]() then
 				return false
 			end
-			if MENU_CHAMP.lcore.enabled:Value() and MENU_CHAMP.lcore.response:Value() and LocalGameTimer() > self.AttackLocalStart + self.AttackWindUp + MENU_CHAMP.lcore.extraw:Value() * 0.001 then
-				return true
-			end
 			if Utilities:GetDistanceSquared(myHero.pos, _G.mousePos) < 15000 then
 				return false
 			end
 			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackCastEndTime + extraDelay + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
-					return true
-				end
-				if MENU_CHAMP.lcore.enabled:Value() and LocalGameTimer() > self.AttackLocalStart + self.AttackWindUp + MENU_CHAMP.lcore.extraw:Value() * 0.001 then
+				if LocalGameTimer() >= self.AttackStartTime + UTILS:GetWindup() + extraDelay - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
 					return true
 				end
 				return false
 			end
-			if LocalGameTimer() < self.AttackLocalStart + 0.2 then
-				return false
-			end
+			if self:WaitingForResponseFromServer() then return false end
 			return true
 		end
 		function c:AttackMove(unit, isLH, isLC)
@@ -1389,7 +1357,7 @@ META1 =
 			elseif Orbwalker.Modes[ORBWALKER_MODE_LANECLEAR] then
 				if FARM.IsLastHitable then
 					result = FARM:GetLastHitTarget()
-				elseif LocalGameTimer() > FARM.ShouldWaitTime + MENU_CHAMP.lclear.swait:Value() * 0.001 then
+				elseif LocalGameTimer() > FARM.ShouldWaitTime + MENU.orb.lclear.swait:Value() * 0.001 then
 					result = FARM:GetLaneClearTarget()
 				end
 			elseif Orbwalker.Modes[ORBWALKER_MODE_FLEE] then
@@ -1427,7 +1395,7 @@ META1 =
 			elseif Orbwalker.Modes[ORBWALKER_MODE_LANECLEAR] then
 				if FARM.IsLastHitable then
 					self:AttackMove(FARM:GetLastHitTarget(), true)
-				elseif LocalGameTimer() > FARM.ShouldWaitTime + MENU_CHAMP.lclear.swait:Value() * 0.001 then
+				elseif LocalGameTimer() > FARM.ShouldWaitTime + MENU.orb.lclear.swait:Value() * 0.001 then
 					self:AttackMove(FARM:GetLaneClearTarget(), false, true)
 				else
 					self:AttackMove()
@@ -1441,70 +1409,46 @@ META1 =
 			end
 		end
 		function c:Tick()
-			-- COMMENTED FOR FUTURE USAGE ! Calculate Animation & WindUp AttackTime
-				--local baseAnimationTime = myHero.attackSpeed * (1 / myHero.attackData.animationTime / myHero.attackSpeed)
-				--local baseWindUpTime = myHero.attackData.windUpTime / myHero.attackData.animationTime
-				--local animationTime = 1 / baseAnimationTime
-				--local windUpTime = animationTime * baseWindUpTime
-				--print(tostring(animationTime) .. " " .. tostring(myHero.attackData.animationTime))
-				--print(tostring(windUpTime) .. " " .. tostring(myHero.attackData.windUpTime))
-			-- Get AttackData from myHero.attackData
-				if self.AttackSpeed == 0 and myHero.attackSpeed then self.AttackSpeed = myHero.attackSpeed end
-				if self.AttackWindUp == 0 and myHero.attackData.windUpTime then self.AttackWindUp = myHero.attackData.windUpTime end
-				if self.AttackAnim == 0 and myHero.attackData.animationTime then self.AttackAnim = myHero.attackData.animationTime end
-				if self.AttackProjSpeed == -1 and myHero.attackData.projectileSpeed then self.AttackProjSpeed = myHero.attackData.projectileSpeed end
-			-- Get AttackData from myHero.activeSpell
-				if myHero.attackData.endTime > GOSAPIBROKEN then
-					GOSAPIBROKEN = myHero.attackData.endTime
-					for i = 1, #self.OnAttackC do
-						self.OnAttackC[i]()
+			if myHero.attackData.endTime > GOSAPIBROKEN then
+				GOSAPIBROKEN = myHero.attackData.endTime
+				for i = 1, #self.OnAttackC do
+					self.OnAttackC[i]()
+				end
+				self.AttackStartTime = myHero.attackData.endTime - myHero.attackData.animationTime
+				self.AttackCastEndTime = Game.Timer() + UTILS:GetWindup()
+				if GAMSTERON_MODE_DMG then
+					if self.TestCount == 0 then
+						self.TestStartTime = LocalGameTimer()
 					end
-					self.AttackStartTime = myHero.attackData.endTime - myHero.attackData.animationTime
-					self.AttackCastEndTime = self.AttackStartTime + myHero.attackData.windUpTime
-					self.AttackSpeed = myHero.attackSpeed
-					self.AttackWindUp = myHero.attackData.windUpTime
-					self.AttackAnim = myHero.attackData.animationTime
-					self.AttackEndTime = myHero.attackData.endTime
-					self.AttackProjSpeed = myHero.attackData.projectileSpeed
-					if GAMSTERON_MODE_DMG then
-						if self.TestCount == 0 then
-							self.TestStartTime = LocalGameTimer()
-						end
-						self.TestCount = self.TestCount + 1
-						if self.TestCount == 5 then
-							print("5 attacks in time: " .. tostring(LocalGameTimer() - self.TestStartTime) .. "[sec]")
-							self.TestCount = 0
-							self.TestStartTime = 0
-						end
+					self.TestCount = self.TestCount + 1
+					if self.TestCount == 5 then
+						print("5 attacks in time: " .. tostring(LocalGameTimer() - self.TestStartTime) .. "[sec]")
+						self.TestCount = 0
+						self.TestStartTime = 0
 					end
 				end
-				--[[
-				local spell = myHero.activeSpell
-				if spell and spell.valid and spell.castEndTime > self.AttackCastEndTime and (not myHero.isChanneling or self.SpecialAutoAttacks[spell.name]) then
-					for i = 1, #self.OnAttackC do
-						self.OnAttackC[i]()
+			end
+			--[[
+			local spell = myHero.activeSpell
+			if spell and spell.valid and spell.castEndTime > self.AttackCastEndTime and (not myHero.isChanneling or self.SpecialAutoAttacks[spell.name]) then
+				for i = 1, #self.OnAttackC do
+					self.OnAttackC[i]()
+				end
+				self.AttackCastEndTime = spell.castEndTime
+				self.AttackStartTime = spell.startTime
+				if GAMSTERON_MODE_DMG then
+					if self.TestCount == 0 then
+						self.TestStartTime = LocalGameTimer()
 					end
-					self.AttackCastEndTime = spell.castEndTime
-					self.AttackSpeed = myHero.attackSpeed
-					self.AttackWindUp = spell.windup
-					self.AttackAnim = spell.animation
-					self.AttackStartTime = spell.startTime
-					self.AttackEndTime = spell.endTime
-					self.AttackProjSpeed = spell.speed
-					if GAMSTERON_MODE_DMG then
-						if self.TestCount == 0 then
-							self.TestStartTime = LocalGameTimer()
-						end
-						self.TestCount = self.TestCount + 1
-						if self.TestCount == 5 then
-							print("5 attacks in time: " .. tostring(LocalGameTimer() - self.TestStartTime) .. "[sec]")
-							self.TestCount = 0
-							self.TestStartTime = 0
-						end
+					self.TestCount = self.TestCount + 1
+					if self.TestCount == 5 then
+						print("5 attacks in time: " .. tostring(LocalGameTimer() - self.TestStartTime) .. "[sec]")
+						self.TestCount = 0
+						self.TestStartTime = 0
 					end
 				end
-				--]]
-				self.AttackWindUp = UTILS:GetWindup()
+			end
+			--]]
 			self:Orbwalk()
 		end
 		return result
@@ -1719,8 +1663,6 @@ META1 =
 			end
 			if myHero.attackData.projectileSpeed then
 				return myHero.attackData.projectileSpeed
-			elseif ORB.AttackProjSpeed > 0 then
-				return ORB.AttackProjSpeed
 			end
 			return math.huge
 		end
@@ -1731,9 +1673,7 @@ META1 =
 					return SpecialWindUpTime
 				end
 			end
-			if ORB.AttackWindUp > 0 then
-				return ORB.AttackWindUp
-			elseif myHero.attackData.windUpTime then
+			if myHero.attackData.windUpTime then
 				return myHero.attackData.windUpTime
 			end
 			return 0.25
@@ -1755,7 +1695,7 @@ META1 =
 		end
 		function c:GetDistance(a,b)
 			local x = a.x - b.x
-			local z = a.z - b.z
+			local z = (a.z or a.y) - (b.z or b.y)
 			return x * x + z * z
 		end
 		function c:GetLatency(extra)
@@ -3620,7 +3560,7 @@ META2 =
 			ORB.AttackEnabled = boolean
 		end
 		function c:ShouldWait()
-			return LocalGameTimer() <= FARM.ShouldWaitTime + MENU_CHAMP.lclear.swait:Value() * 0.001
+			return LocalGameTimer() <= FARM.ShouldWaitTime + MENU.orb.lclear.swait:Value() * 0.001
 		end
 		function c:GetTarget()
 			return ORB:GetTarget()
@@ -3668,8 +3608,8 @@ META2 =
 		function c:__OnAutoAttackReset()
 			ACTIONS:Add(function()
 				ORB.ResetAttack = true
-				ORB.AttackEndTime = 0
 				ORB.AttackLocalStart = 0
+				ORB.AttackStartTime = 0
 			end, 0.05)
 		end
 		return result
@@ -4246,10 +4186,6 @@ META2 =
 					local dmg = attack.Damage
 					local objtype = attack.Type
 					local isTurret = objtype == Obj_AI_Turret
-					local time2 = time
-					if isTurret then
-						time2 = time2 - 0.1
-					end
 					local ismoving = false
 					if not isTurret then ismoving = attacker.pathing.hasMovePath end
 					if attacker.attackData.target == handle and not ismoving then
@@ -4257,8 +4193,10 @@ META2 =
 							self.TurretHasTarget = true
 						end
 						local flyTime
-						if attacker.attackData.projectileSpeed and attacker.attackData.projectileSpeed > 0 then
-							flyTime = attacker.pos:DistanceTo(pos) / attacker.attackData.projectileSpeed
+						local time2 = time
+						local projSpeed = attacker.attackData.projectileSpeed; if isTurret then projSpeed = 700; time2 = time2 - 0.1; end
+						if projSpeed and projSpeed > 0 then
+							flyTime = attacker.pos:DistanceTo(pos) / projSpeed
 						else
 							flyTime = 0
 						end
@@ -4275,7 +4213,7 @@ META2 =
 				return hp
 			end
 			function c:ShouldWait()
-				return LocalGameTimer() <= self.ShouldWaitTime + MENU_CHAMP.lclear.swait:Value() * 0.001
+				return LocalGameTimer() <= self.ShouldWaitTime + MENU.orb.lclear.swait:Value() * 0.001
 			end
 			function c:SetLastHitable(target, time, damage)
 				local hpPred = self:GetPrediction(target, time)
