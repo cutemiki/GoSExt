@@ -5,7 +5,7 @@ if _G.SDK and _G.SDK.Orbwalker then
 	print("Gamsteron Core can not be loaded ! Please unload IC Orbwalker first !")
 	return
 end
-local Version = 19.5
+local Version = 19.6
 -- update
 local Files =
 {
@@ -803,7 +803,7 @@ META1 =
 			if lastHitable then self.IsLastHitable = true end
 			local almostLastHitable = false
 			if not lastHitable then
-				local dmg = self:GetPrediction(target, myHero.attackData.animationTime * 2.1 + time * 2.1) - self:GetPossibleDmg(target)
+				local dmg = self:GetPrediction(target, myHero.attackData.animationTime * 1.75 + time * 3) - self:GetPossibleDmg(target)
 				almostLastHitable = dmg - damage < 0
 			end
 			if almostLastHitable then
@@ -1328,7 +1328,6 @@ META1 =
 		function c:WndMsg(msg, wParam)
 			if not CURSOR.IsReadyGlobal then
 				if wParam == MENU.orb.aamoveclick:Key() then
-					self.AttackLocalStart = LocalGameTimer()
 					CURSOR.IsReadyGlobal = true
 					--print("attack")
 				elseif wParam == CURSOR.Key then
@@ -1409,13 +1408,13 @@ META1 =
 			end
 		end
 		function c:Tick()
-			if myHero.attackData.endTime > GOSAPIBROKEN then
+			--[[if myHero.attackData.endTime > GOSAPIBROKEN then
 				GOSAPIBROKEN = myHero.attackData.endTime
 				for i = 1, #self.OnAttackC do
 					self.OnAttackC[i]()
 				end
 				self.AttackStartTime = myHero.attackData.endTime - myHero.attackData.animationTime
-				self.AttackCastEndTime = Game.Timer() + UTILS:GetWindup()
+				self.AttackCastEndTime = Game.Timer() + 0.15
 				if GAMSTERON_MODE_DMG then
 					if self.TestCount == 0 then
 						self.TestStartTime = LocalGameTimer()
@@ -1427,8 +1426,7 @@ META1 =
 						self.TestStartTime = 0
 					end
 				end
-			end
-			--[[
+			end--]]
 			local spell = myHero.activeSpell
 			if spell and spell.valid and spell.castEndTime > self.AttackCastEndTime and (not myHero.isChanneling or self.SpecialAutoAttacks[spell.name]) then
 				for i = 1, #self.OnAttackC do
@@ -1448,7 +1446,6 @@ META1 =
 					end
 				end
 			end
-			--]]
 			self:Orbwalk()
 		end
 		return result
@@ -2031,7 +2028,6 @@ META1 =
 			c.__index = c
 			setmetatable(result, c)
 		function c:DisableAutoAttack()
-			--[[
 			local a = myHero.activeSpell
 			if a and a.valid and a.startTime > self.StartTime and myHero.isChanneling and not ORB.SpecialAutoAttacks[a.name] then
 				local name = a.name
@@ -2045,11 +2041,11 @@ META1 =
 				t = t - UTILS:GetLatency(0)
 				self.SpellEndTime = t
 				self.StartTime = a.startTime
-				if LocalGameTimer() < ORB.AttackLocalStart + ORB.AttackWindUp - 0.09 or LocalGameTimer() < ORB.AttackCastEndTime - 0.1 then
+				if LocalGameTimer() < ORB.AttackLocalStart + UTILS:GetWindup() - 0.09 or LocalGameTimer() < ORB.AttackCastEndTime - 0.1 then
 					Orbwalker:__OnAutoAttackReset()
 				end
 				return true
-			end--]]
+			end
 			return false
 		end
 		function c:WndMsg(msg, wParam)
