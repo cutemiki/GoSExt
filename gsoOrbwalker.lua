@@ -5,7 +5,7 @@ if _G.SDK and _G.SDK.Orbwalker then
 	print("Gamsteron Core can not be loaded ! Please unload IC Orbwalker first !")
 	return
 end
-local Version = 19.7
+local Version = 19.8
 -- update
 local Files =
 {
@@ -805,7 +805,7 @@ META1 =
 			if lastHitable then self.IsLastHitable = true end
 			local almostLastHitable = false
 			if not lastHitable then
-				local dmg = self:GetPrediction(target, myHero.attackData.animationTime * 1.75 + time * 3) - self:GetPossibleDmg(target)
+				local dmg = self:GetPrediction(target, (myHero.attackData.animationTime * 1.5) + (time * 3)) - self:GetPossibleDmg(target)
 				almostLastHitable = dmg - damage < 0
 			end
 			if almostLastHitable then
@@ -1063,10 +1063,15 @@ META1 =
 			setmetatable(result, c)
 		function c:CreateMenu()
 			MENU:MenuElement({name = "Orbwalker", id = "orb", type = _G.MENU, leftIcon = "https://raw.githubusercontent.com/gamsteron/GoSExt/master/Icons/orb.png" })
-				MENU.orb:MenuElement({ name = "Extra Windup", id = "extrawindup", value = 0, min = 0, max = 100, step = 1 })
 				MENU.orb:MenuElement({ name = "Latency", id = "clat", value = 50, min = 0, max = 150, step = 1 })
+				MENU.orb:MenuElement({ name = "Extra Windup", id = "extrawindup", value = 0, min = 0, max = 100, step = 1 })
 				MENU.orb:MenuElement({ name = "Extra Cursor Delay", id = "excdelay", value = 25, min = 0, max = 50, step = 5 })
-				MENU.orb:MenuElement({name = "Player Attack Move Click", id = "aamoveclick", key = string.byte("P")})
+				MENU.orb:MenuElement({name = "Player Attack Move Click", id = "aamoveclick", key = string.byte("U")})
+				--[[MENU.orb:MenuElement({ name = "Orbwalker Timers", id = "lcore", type = _G.MENU })
+					MENU.orb.lcore:MenuElement({name = "ON - Local, OFF - Server", id = "enabled", value = false })
+					MENU.orb.lcore:MenuElement({ name = "Server Extra Windup", id = "extrawindup", value = 0, min = 0, max = 100, step = 1 })
+					MENU.orb.lcore:MenuElement({ name = "Local Extra Windup (higher = slower kite)", id = "extraw", value = 0, min = 0, max = 150, step = 1 })
+					MENU.orb.lcore:MenuElement({ name = "Local Extra Anim (higher = less dps)", id = "extraa", value = 0, min = 0, max = 100, step = 1 })--]]
 				MENU.orb:MenuElement({ name = "LaneClear", id = "lclear", type = _G.MENU })
 					MENU.orb.lclear:MenuElement({name = "Attack Heroes", id = "laneset", value = true })
 					MENU.orb.lclear:MenuElement({name = "Extra Farm Delay", id = "extrafarm", value = 50, min = 0, max = 100, step = 1 })
@@ -1225,24 +1230,22 @@ META1 =
 			if LocalGameTimer() < SPELLS.ObjectEndTime then
 				return false
 			end
-			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackStartTime + myHero.attackData.animationTime - UTILS:GetLatency(0) - 0.04 then
+			--[[if MENU.orb.lcore.enabled:Value() then
+				local extraAnim = MENU.orb.lcore.extraa:Value() * 0.001; extraAnim = extraAnim - UTILS:GetLatency(0.04)
+				if LocalGameTimer() > self.AttackLocalStart + myHero.attackData.animationTime + extraAnim then
 					return true
 				end
 				return false
-			end
-			if self:WaitingForResponseFromServer() then return false end
-			return true
-		end
-		function c:CanMoveSpell()
-			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackStartTime + UTILS:GetWindup() + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
-					return true
+			else--]]
+				if self.AttackCastEndTime > self.AttackLocalStart then
+					if LocalGameTimer() >= self.AttackStartTime + myHero.attackData.animationTime - UTILS:GetLatency(0.04) then
+						return true
+					end
+					return false
 				end
-				return false
-			end
-			if self:WaitingForResponseFromServer() then return false end
-			return true
+				if self:WaitingForResponseFromServer() then return false end
+				return true
+			--end
 		end
 		function c:CanMove(extraDelay)
 			local onlyMove = extraDelay == 0
@@ -1267,14 +1270,41 @@ META1 =
 			if Utilities:GetDistanceSquared(myHero.pos, _G.mousePos) < 15000 then
 				return false
 			end
-			if self.AttackCastEndTime > self.AttackLocalStart then
-				if LocalGameTimer() >= self.AttackStartTime + UTILS:GetWindup() + extraDelay - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
+			--[[if MENU.orb.lcore.enabled:Value() then
+				local extraWindUp = MENU.orb.lcore.extraw:Value() * 0.001; extraWindUp = extraWindUp - UTILS:GetLatency(-0.1)
+				if LocalGameTimer() > self.AttackLocalStart + myHero.attackData.windUpTime + extraWindUp then
 					return true
 				end
 				return false
-			end
-			if self:WaitingForResponseFromServer() then return false end
-			return true
+			else--]]
+				if self.AttackCastEndTime > self.AttackLocalStart then
+					local extraWindUp = MENU.orb.extrawindup:Value() * 0.001; extraWindUp = extraWindUp - UTILS:GetLatency(0)
+					if LocalGameTimer() >= self.AttackStartTime + UTILS:GetWindup() + extraDelay + extraWindUp then
+						return true
+					end
+					return false
+				end
+				if self:WaitingForResponseFromServer() then return false end
+				return true
+			--end
+		end
+		function c:CanMoveSpell()
+			--[[if MENU.orb.lcore.enabled:Value() then
+				local extraWindUp = MENU.orb.lcore.extraw:Value() * 0.001; extraWindUp = extraWindUp - UTILS:GetLatency(0)
+				if LocalGameTimer() > self.AttackLocalStart + myHero.attackData.windUpTime + extraWindUp + 0.01 then
+					return true
+				end
+				return false
+			else--]]
+				if self.AttackCastEndTime > self.AttackLocalStart then
+					if LocalGameTimer() >= self.AttackStartTime + UTILS:GetWindup() + 0.01 - UTILS:GetLatency(0) + (MENU.orb.extrawindup:Value() * 0.001) then
+						return true
+					end
+					return false
+				end
+				if self:WaitingForResponseFromServer() then return false end
+				return true
+			--end
 		end
 		function c:AttackMove(unit, isLH, isLC)
 			if self.AttackEnabled and unit and unit.pos:ToScreen().onScreen and self:CanAttack() then
@@ -1330,6 +1360,7 @@ META1 =
 		function c:WndMsg(msg, wParam)
 			if not CURSOR.IsReadyGlobal then
 				if wParam == MENU.orb.aamoveclick:Key() then
+					--if MENU.orb.lcore.enabled:Value() then self.AttackLocalStart = LocalGameTimer() end
 					CURSOR.IsReadyGlobal = true
 					--print("attack")
 				elseif wParam == CURSOR.Key then
@@ -1410,7 +1441,7 @@ META1 =
 			end
 		end
 		function c:Tick()
-			--[[if myHero.attackData.endTime > GOSAPIBROKEN then
+			if myHero.attackData.endTime > GOSAPIBROKEN then
 				GOSAPIBROKEN = myHero.attackData.endTime
 				for i = 1, #self.OnAttackC do
 					self.OnAttackC[i]()
@@ -1428,8 +1459,8 @@ META1 =
 						self.TestStartTime = 0
 					end
 				end
-			end--]]
-			local spell = myHero.activeSpell
+			end
+			--[[local spell = myHero.activeSpell
 			if spell and spell.valid and spell.castEndTime > self.AttackCastEndTime and (not myHero.isChanneling or self.SpecialAutoAttacks[spell.name]) then
 				for i = 1, #self.OnAttackC do
 					self.OnAttackC[i]()
@@ -1447,7 +1478,7 @@ META1 =
 						self.TestStartTime = 0
 					end
 				end
-			end
+			end--]]
 			self:Orbwalk()
 		end
 		return result
